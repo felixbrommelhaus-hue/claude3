@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messe-Moment - B2B Messe Kampagnen</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        .gradient-bg { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+        }
+        
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .drag-zone {
+            transition: all 0.2s ease;
+        }
+        
+        .drag-zone.drag-over {
+            background-color: #e0e7ff;
+            border-color: #6366f1;
+            border-style: dashed;
+        }
+        
+        .touchpoint-item {
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+        
+        .touchpoint-item:hover {
+            transform: scale(1.05);
+        }
+        
+        .touchpoint-item:active {
+            cursor: grabbing;
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body class="h-full bg-gray-50">
+    <div id="root" class="h-full"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        // Mock Data Store
+        const mockData = {
+            user: {
+                id: 1,
+                name: "Max Mustermann",
+                company: "TechCorp GmbH",
+                email: "max@techcorp.de"
+            },
+            campaigns: [
+                {
+                    id: 1,
+                    name: "Hannover Messe 2025",
+                    status: "active",
+                    created: "2025-07-15",
+                    touchpoints: 3,
+                    scans: 247,
+                    conversions: 32,
+                    qrCodes: ["QR001", "QR002", "QR003"]
+                },
+                {
+                    id: 2,
+                    name: "CeBIT Connect",
+                    status: "draft",
+                    created: "2025-07-20",
+                    touchpoints: 1,
+                    scans: 0,
+                    conversions: 0,
+                    qrCodes: ["QR004"]
+                }
+            ],
+            touchpointTypes: [
+                { id: 'quiz', name: 'Quiz', icon: 'HelpCircle', description: 'Interaktives Quiz mit Auswertung' },
+                { id: 'contest', name: 'Gewinnspiel', icon: 'Gift', description: 'Teilnahme an Verlosung' },
+                { id: 'download', name: 'Download', icon: 'Download', description: 'Whitepaper, Kataloge, etc.' },
+                { id: 'survey', name: 'Umfrage', icon: 'MessageSquare', description: 'Feedback sammeln' },
+                { id: 'video', name: 'Video', icon: 'Play', description: 'Produktvideos, Demos' },
+                { id: 'booking', name: 'Termin', icon: 'Calendar', description: 'Meeting-Buchung' },
+                { id: 'contact', name: 'Kontakt', icon: 'User', description: 'Kontaktformular' }
+            ]
+        };
+
+        // Icon Component
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const iconRef = useRef();
+            
+            useEffect(() => {
+                if (iconRef.current && window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [name]);
+            
+            return React.createElement('i', {
+                ref: iconRef,
+                'data-lucide': name.toLowerCase(),
+                className: className,
+                style: { width: size, height: size }
+            });
+        };
+
+        // Authentication Context
+        const AuthContext = React.createContext();
+        
+        const AuthProvider = ({ children }) => {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [user, setUser] = useState(null);
+            
+            const login = (email, password) => {
+                // Mock authentication
+                if (email && password) {
+                    setUser(mockData.user);
+                    setIsAuthenticated(true);
+                    return true;
+                }
+                return false;
+            };
+            
+            const logout = () => {
+                setUser(null);
+                setIsAuthenticated(false);
+            };
+            
+            return (
+                <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+                    {children}
+                </AuthContext.Provider>
+            );
+        };
+
+        // Login Component
+        const LoginPage = ({ onLogin }) => {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+                
+                // Simulate API call
+                setTimeout(() => {
+                    if (onLogin(email, password)) {
+                        // Login successful
+                    }
+                    setIsLoading(false);
+                }, 1000);
+            };
+            
+            return (
+                <div className="min-h-screen gradient-bg flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+                    <div className="max-w-md w-full space-y-8">
+                        <div className="text-center">
+                            <div className="mx-auto h-16 w-16 bg-white rounded-full flex items-center justify-center mb-4 animate-float">
+                                <Icon name="Zap" size={32} className="text-indigo-600" />
+                            </div>
+                            <h2 className="text-4xl font-bold text-white mb-2">Messe-Moment</h2>
+                            <p className="text-indigo-200">Ihre B2B-Messe Kampagnen Plattform</p>
+                        </div>
+                        
+                        <form className="glassmorphism rounded-lg p-8 space-y-6" onSubmit={handleSubmit}>
+                            <div>
+                                <label className="sr-only">E-Mail</label>
+                                <input
+                                    type="email"
+                                    required
+                                    className="w-full px-3 py-3 border border-gray-300 rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    placeholder="E-Mail Adresse"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="sr-only">Passwort</label>
+                                <input
+                                    type="password"
+                                    required
+                                    className="w-full px-3 py-3 border border-gray-300 rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    placeholder="Passwort"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                />
+                            </div>
+                            
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-all duration-200"
+                            >
+                                {isLoading ? (
+                                    <Icon name="Loader" className="animate-spin" />
+                                ) : (
+                                    'Anmelden'
+                                )}
+                            </button>
+                            
+                            <div className="text-center">
+                                <a href="#" className="text-indigo-200 hover:text-white text-sm">
+                                    Noch kein Account? Jetzt registrieren
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // Navigation Component
+        const Navigation = ({ currentView, setCurrentView, user, onLogout }) => {
+            const navItems = [
+                { id: 'dashboard', name: 'Dashboard', icon: 'BarChart3' },
+                { id: 'campaigns', name: 'Kampagnen', icon: 'Megaphone' },
+                { id: 'builder', name: 'Builder', icon: 'Blocks' },
+                { id: 'analytics', name: 'Analytics', icon: 'TrendingUp' },
+                { id: 'qr-codes', name: 'QR-Codes', icon: 'QrCode' }
+            ];
+            
+            return (
+                <nav className="bg-white shadow-sm border-b">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="flex justify-between h-16">
+                            <div className="flex items-center space-x-8">
+                                <div className="flex-shrink-0 flex items-center">
+                                    <Icon name="Zap" size={24} className="text-indigo-600 mr-2" />
+                                    <span className="text-xl font-bold text-gray-900">Messe-Moment</span>
+                                </div>
+                                
+                                <div className="hidden md:flex space-x-4">
+                                    {navItems.map(item => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => setCurrentView(item.id)}
+                                            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center space-x-2 ${
+                                                currentView === item.id
+                                                    ? 'bg-indigo-100 text-indigo-700'
+                                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            <Icon name={item.icon} size={16} />
+                                            <span>{item.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-4">
+                                <div className="text-sm text-gray-700">
+                                    {user?.company}
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                        <span className="text-indigo-600 text-sm font-medium">
+                                            {user?.name?.charAt(0)}
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={onLogout}
+                                        className="text-gray-500 hover:text-gray-700"
+                                    >
+                                        <Icon name="LogOut" size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+            );
+        };
+
+        // Dashboard Component
+        const Dashboard = () => {
+            const stats = [
+                { name: 'Aktive Kampagnen', value: '2', change: '+12%', icon: 'Megaphone' },
+                { name: 'Gesamt Scans', value: '247', change: '+18%', icon: 'QrCode' },
+                { name: 'Conversions', value: '32', change: '+23%', icon: 'TrendingUp' },
+                { name: 'Conversion Rate', value: '13%', change: '+5%', icon: 'Target' }
+            ];
+            
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
+                        <p className="text-gray-600">Übersicht Ihrer Messe-Kampagnen</p>
+                    </div>
+                    
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+                        {stats.map((stat, index) => (
+                            <div key={index} className="bg-white overflow-hidden shadow rounded-lg card-hover">
+                                <div className="p-6">
+                                    <div className="flex items-center">
+                                        <div className="flex-shrink-0">
+                                            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                                <Icon name={stat.icon} size={20} className="text-indigo-600" />
+                                            </div>
+                                        </div>
+                                        <div className="ml-5 w-0 flex-1">
+                                            <dl>
+                                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                                    {stat.name}
+                                                </dt>
+                                                <dd className="flex items-baseline">
+                                                    <div className="text-2xl font-semibold text-gray-900">
+                                                        {stat.value}
+                                                    </div>
+                                                    <div className="ml-2 flex items-baseline text-sm font-semibold text-green-600">
+                                                        {stat.change}
+                                                    </div>
+                                                </dd>
+                                            </dl>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    {/* Recent Activity */}
+                    <div className="bg-white shadow rounded-lg">
+                        <div className="px-6 py-4 border-b border-gray-200">
+                            <h3 className="text-lg font-medium text-gray-900">Letzte Aktivitäten</h3>
+                        </div>
+                        <div className="divide-y divide-gray-200">
+                            {[
+                                { action: 'QR-Code gescannt', campaign: 'Hannover Messe 2025', time: 'vor 2 Min.' },
+                                { action: 'Gewinnspiel-Teilnahme', campaign: 'Hannover Messe 2025', time: 'vor 5 Min.' },
+                                { action: 'Download abgeschlossen', campaign: 'Hannover Messe 2025', time: 'vor 12 Min.' },
+                                { action: 'Neue Kampagne erstellt', campaign: 'CeBIT Connect', time: 'vor 2 Std.' }
+                            ].map((activity, index) => (
+                                <div key={index} className="px-6 py-4 flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900">{activity.action}</p>
+                                            <p className="text-sm text-gray-500">{activity.campaign}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-sm text-gray-500">{activity.time}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Campaigns List Component
+        const CampaignsList = ({ onEditCampaign }) => {
+            const [campaigns, setCampaigns] = useState(mockData.campaigns);
+            
+            const duplicateCampaign = (campaign) => {
+                const newCampaign = {
+                    ...campaign,
+                    id: Date.now(),
+                    name: `${campaign.name} (Kopie)`,
+                    status: 'draft',
+                    created: new Date().toISOString().split('T')[0],
+                    scans: 0,
+                    conversions: 0
+                };
+                setCampaigns([...campaigns, newCampaign]);
+            };
+            
+            const deleteCampaign = (id) => {
+                if (window.confirm('Kampagne wirklich löschen?')) {
+                    setCampaigns(campaigns.filter(c => c.id !== id));
+                }
+            };
+            
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900 mb-2">Kampagnen</h1>
+                            <p className="text-gray-600">Verwalten Sie Ihre Messe-Kampagnen</p>
+                        </div>
+                        <button
+                            onClick={() => onEditCampaign(null)}
+                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200"
+                        >
+                            <Icon name="Plus" size={16} className="mr-2" />
+                            Neue Kampagne
+                        </button>
+                    </div>
+                    
+                    <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                        <ul className="divide-y divide-gray-200">
+                            {campaigns.map(campaign => (
+                                <li key={campaign.id} className="hover:bg-gray-50 transition-colors duration-150">
+                                    <div className="px-6 py-4 flex items-center justify-between">
+                                        <div className="flex items-center space-x-4">
+                                            <div className={`w-3 h-3 rounded-full ${
+                                                campaign.status === 'active' ? 'bg-green-400' : 'bg-gray-400'
+                                            }`}></div>
+                                            <div>
+                                                <h3 className="text-lg font-medium text-gray-900">{campaign.name}</h3>
+                                                <p className="text-sm text-gray-500">Erstellt am {campaign.created}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center space-x-8">
+                                            <div className="text-center">
+                                                <div className="text-2xl font-semibold text-gray-900">{campaign.touchpoints}</div>
+                                                <div className="text-xs text-gray-500">Touchpoints</div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="text-2xl font-semibold text-gray-900">{campaign.scans}</div>
+                                                <div className="text-xs text-gray-500">Scans</div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="text-2xl font-semibold text-gray-900">{campaign.conversions}</div>
+                                                <div className="text-xs text-gray-500">Conversions</div>
+                                            </div>
+                                            
+                                            <div className="flex items-center space-x-2">
+                                                <button
+                                                    onClick={() => onEditCampaign(campaign)}
+                                                    className="text-indigo-600 hover:text-indigo-900"
+                                                >
+                                                    <Icon name="Edit" size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => duplicateCampaign(campaign)}
+                                                    className="text-gray-400 hover:text-gray-600"
+                                                >
+                                                    <Icon name="Copy" size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteCampaign(campaign.id)}
+                                                    className="text-red-400 hover:text-red-600"
+                                                >
+                                                    <Icon name="Trash2" size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            );
+        };
+
+        // Campaign Builder Component
+        const CampaignBuilder = ({ campaign, onSave, onCancel }) => {
+            const [campaignData, setCampaignData] = useState(campaign || {
+                name: '',
+                description: '',
+                touchpoints: []
+            });
+            
+            const [draggedItem, setDraggedItem] = useState(null);
+            const [showTouchpointModal, setShowTouchpointModal] = useState(false);
+            const [selectedTouchpoint, setSelectedTouchpoint] = useState(null);
+            
+            const handleDragStart = (e, touchpointType) => {
+                setDraggedItem(touchpointType);
+                e.dataTransfer.effectAllowed = 'copy';
+            };
+            
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                e.currentTarget.classList.add('drag-over');
+            };
+            
+            const handleDragLeave = (e) => {
+                e.currentTarget.classList.remove('drag-over');
+            };
+            
+            const handleDrop = (e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('drag-over');
+                
+                if (draggedItem) {
+                    const newTouchpoint = {
+                        id: Date.now(),
+                        type: draggedItem.id,
+                        name: draggedItem.name,
+                        icon: draggedItem.icon,
+                        settings: {}
+                    };
+                    
+                    setCampaignData(prev => ({
+                        ...prev,
+                        touchpoints: [...prev.touchpoints, newTouchpoint]
+                    }));
+                    
+                    setDraggedItem(null);
+                }
+            };
+            
+            const removeTouchpoint = (id) => {
+                setCampaignData(prev => ({
+                    ...prev,
+                    touchpoints: prev.touchpoints.filter(tp => tp.id !== id)
+                }));
+            };
+            
+            const editTouchpoint = (touchpoint) => {
+                setSelectedTouchpoint(touchpoint);
+                setShowTouchpointModal(true);
+            };
+            
+            const saveTouchpoint = (updatedTouchpoint) => {
+                setCampaignData(prev => ({
+                    ...prev,
+                    touchpoints: prev.touchpoints.map(tp => 
+                        tp.id === updatedTouchpoint.id ? updatedTouchpoint : tp
+                    )
+                }));
+                setShowTouchpointModal(false);
+                setSelectedTouchpoint(null);
+            };
+            
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                                {campaign ? 'Kampagne bearbeiten' : 'Neue Kampagne'}
+                            </h1>
+                            <p className="text-gray-600">Gestalten Sie Ihre interaktive Messe-Erfahrung</p>
+                        </div>
+                        <div className="flex space-x-4">
+                            <button
+                                onClick={onCancel}
+                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            >
+                                Abbrechen
+                            </button>
+                            <button
+                                onClick={() => onSave(campaignData)}
+                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                Speichern
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-12 gap-8">
+                        {/* Sidebar with Touchpoint Types */}
+                        <div className="col-span-3">
+                            <div className="bg-white rounded-lg shadow p-6">
+                                <h3 className="text-lg font-medium text-gray-900 mb-4">Touchpoints</h3>
+                                <div className="space-y-3">
+                                    {mockData.touchpointTypes.map(type => (
+                                        <div
+                                            key={type.id}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, type)}
+                                            className="touchpoint-item p-3 border border-gray-200 rounded-lg bg-gray-50 hover:bg-gray-100"
+                                        >
+                                            <div className="flex items-center space-x-3">
+                                                <Icon name={type.icon} size={20} className="text-indigo-600" />
+                                                <div>
+                                                    <div className="font-medium text-sm">{type.name}</div>
+                                                    <div className="text-xs text-gray-500">{type.description}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Main Builder Area */}
+                        <div className="col-span-9">
+                            <div className="bg-white rounded-lg shadow">
+                                <div className="p-6 border-b border-gray-200">
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Kampagnen-Name
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={campaignData.name}
+                                                onChange={(e) => setCampaignData(prev => ({...prev, name: e.target.value}))}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                placeholder="z.B. Hannover Messe 2025"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Beschreibung
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={campaignData.description}
+                                                onChange={(e) => setCampaignData(prev => ({...prev, description: e.target.value}))}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                placeholder="Kurze Beschreibung der Kampagne"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="p-6">
+                                    <h3 className="text-lg font-medium text-gray-900 mb-4">Kampagnen-Flow</h3>
+                                    
+                                    {/* Drop Zone */}
+                                    <div
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
+                                        className="drag-zone min-h-96 border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center"
+                                    >
+                                        {campaignData.touchpoints.length === 0 ? (
+                                            <div className="text-center">
+                                                <Icon name="MousePointer" size={48} className="text-gray-400 mx-auto mb-4" />
+                                                <h4 className="text-lg font-medium text-gray-900 mb-2">Ziehen Sie Touchpoints hierher</h4>
+                                                <p className="text-gray-500">Erstellen Sie Ihren interaktiven Kampagnen-Flow durch Drag & Drop</p>
+                                            </div>
+                                        ) : (
+                                            <div className="w-full">
+                                                <div className="grid gap-4">
+                                                    {campaignData.touchpoints.map((touchpoint, index) => (
+                                                        <div key={touchpoint.id} className="flex items-center space-x-4">
+                                                            {index > 0 && (
+                                                                <div className="flex flex-col items-center">
+                                                                    <Icon name="ArrowDown" size={16} className="text-gray-400" />
+                                                                </div>
+                                                            )}
+                                                            <div className="flex-1 bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center space-x-3">
+                                                                        <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                                                            <Icon name={touchpoint.icon} size={20} className="text-indigo-600" />
+                                                                        </div>
+                                                                        <div>
+                                                                            <h4 className="font-medium text-gray-900">{touchpoint.name}</h4>
+                                                                            <p className="text-sm text-gray-500">Schritt {index + 1}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <button
+                                                                            onClick={() => editTouchpoint(touchpoint)}
+                                                                            className="text-indigo-600 hover:text-indigo-900"
+                                                                        >
+                                                                            <Icon name="Settings" size={16} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => removeTouchpoint(touchpoint.id)}
+                                                                            className="text-red-400 hover:text-red-600"
+                                                                        >
+                                                                            <Icon name="X" size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Touchpoint Configuration Modal */}
+                    {showTouchpointModal && selectedTouchpoint && (
+                        <TouchpointModal
+                            touchpoint={selectedTouchpoint}
+                            onSave={saveTouchpoint}
+                            onClose={() => {
+                                setShowTouchpointModal(false);
+                                setSelectedTouchpoint(null);
+                            }}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        // Touchpoint Configuration Modal
+        const TouchpointModal = ({ touchpoint, onSave, onClose }) => {
+            const [config, setConfig] = useState({
+                title: touchpoint.settings.title || '',
+                description: touchpoint.settings.description || '',
+                buttonText: touchpoint.settings.buttonText || 'Weiter',
+                ...touchpoint.settings
+            });
+            
+            const handleSave = () => {
+                onSave({
+                    ...touchpoint,
+                    settings: config
+                });
+            };
+            
+            const renderConfigFields = () => {
+                switch (touchpoint.type) {
+                    case 'quiz':
+                        return (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Quiz-Titel</label>
+                                    <input
+                                        type="text"
+                                        value={config.title}
+                                        onChange={(e) => setConfig({...config, title: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="Wie gut kennen Sie unsere Produkte?"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Anzahl Fragen</label>
+                                    <select
+                                        value={config.questionCount || 3}
+                                        onChange={(e) => setConfig({...config, questionCount: parseInt(e.target.value)})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value={3}>3 Fragen</option>
+                                        <option value={5}>5 Fragen</option>
+                                        <option value={10}>10 Fragen</option>
+                                    </select>
+                                </div>
+                            </div>
+                        );
+                    case 'contest':
+                        return (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Gewinnspiel-Titel</label>
+                                    <input
+                                        type="text"
+                                        value={config.title}
+                                        onChange={(e) => setConfig({...config, title: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="Gewinnen Sie ein iPad Pro!"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Gewinn-Beschreibung</label>
+                                    <textarea
+                                        value={config.prize}
+                                        onChange={(e) => setConfig({...config, prize: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        rows={3}
+                                        placeholder="iPad Pro 12.9 Zoll mit Zubehör im Wert von 1.500€"
+                                    />
+                                </div>
+                            </div>
+                        );
+                    case 'download':
+                        return (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Download-Titel</label>
+                                    <input
+                                        type="text"
+                                        value={config.title}
+                                        onChange={(e) => setConfig({...config, title: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="Kostenloses Whitepaper herunterladen"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Datei-URL</label>
+                                    <input
+                                        type="url"
+                                        value={config.fileUrl}
+                                        onChange={(e) => setConfig({...config, fileUrl: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="https://example.com/whitepaper.pdf"
+                                    />
+                                </div>
+                            </div>
+                        );
+                    default:
+                        return (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Titel</label>
+                                    <input
+                                        type="text"
+                                        value={config.title}
+                                        onChange={(e) => setConfig({...config, title: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Beschreibung</label>
+                                    <textarea
+                                        value={config.description}
+                                        onChange={(e) => setConfig({...config, description: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        rows={3}
+                                    />
+                                </div>
+                            </div>
+                        );
+                }
+            };
+            
+            return (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                    <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-medium text-gray-900">
+                                {touchpoint.name} konfigurieren
+                            </h3>
+                            <button
+                                onClick={onClose}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                <Icon name="X" size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="mb-6">
+                            {renderConfigFields()}
+                        </div>
+                        
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={onClose}
+                                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                Abbrechen
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                Speichern
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Analytics Component
+        const Analytics = () => {
+            const chartRef = useRef(null);
+            
+            useEffect(() => {
+                if (chartRef.current && window.Chart) {
+                    const ctx = chartRef.current.getContext('2d');
+                    
+                    new window.Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'],
+                            datasets: [{
+                                label: 'QR-Code Scans',
+                                data: [12, 19, 15, 25, 22, 30, 28],
+                                borderColor: 'rgb(99, 102, 241)',
+                                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+            }, []);
+            
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-2">Analytics</h1>
+                        <p className="text-gray-600">Detaillierte Auswertung Ihrer Kampagnen</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                        {/* Chart */}
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">Scans pro Tag</h3>
+                            <canvas ref={chartRef} width="400" height="200"></canvas>
+                        </div>
+                        
+                        {/* Top Touchpoints */}
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">Top Touchpoints</h3>
+                            <div className="space-y-4">
+                                {[
+                                    { name: 'Gewinnspiel', scans: 89, conversion: '36%' },
+                                    { name: 'Produktvideo', scans: 76, conversion: '28%' },
+                                    { name: 'Whitepaper Download', scans: 52, conversion: '15%' },
+                                    { name: 'Kontaktformular', scans: 30, conversion: '12%' }
+                                ].map((item, index) => (
+                                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <div>
+                                            <div className="font-medium text-gray-900">{item.name}</div>
+                                            <div className="text-sm text-gray-500">{item.scans} Scans</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-medium text-indigo-600">{item.conversion}</div>
+                                            <div className="text-sm text-gray-500">Conversion</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Detailed Analytics Table */}
+                    <div className="bg-white shadow rounded-lg">
+                        <div className="px-6 py-4 border-b border-gray-200">
+                            <h3 className="text-lg font-medium text-gray-900">Detaillierte Auswertung</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Kampagne
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Touchpoint
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Scans
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Conversions
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Rate
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {[
+                                        { campaign: 'Hannover Messe 2025', touchpoint: 'Gewinnspiel', scans: 89, conversions: 32, rate: '36%' },
+                                        { campaign: 'Hannover Messe 2025', touchpoint: 'Produktvideo', scans: 76, conversions: 21, rate: '28%' },
+                                        { campaign: 'Hannover Messe 2025', touchpoint: 'Download', scans: 52, conversions: 8, rate: '15%' },
+                                        { campaign: 'CeBIT Connect', touchpoint: 'Kontakt', scans: 30, conversions: 4, rate: '13%' }
+                                    ].map((row, index) => (
+                                        <tr key={index} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                {row.campaign}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {row.touchpoint}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {row.scans}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {row.conversions}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-medium">
+                                                {row.rate}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // QR Codes Component
+        const QRCodes = () => {
+            const [qrCodes, setQrCodes] = useState([
+                { id: 'QR001', campaign: 'Hannover Messe 2025', touchpoint: 'Gewinnspiel', scans: 89, created: '2025-07-15' },
+                { id: 'QR002', campaign: 'Hannover Messe 2025', touchpoint: 'Produktvideo', scans: 76, created: '2025-07-15' },
+                { id: 'QR003', campaign: 'Hannover Messe 2025', touchpoint: 'Download', scans: 52, created: '2025-07-16' },
+                { id: 'QR004', campaign: 'CeBIT Connect', touchpoint: 'Kontakt', scans: 0, created: '2025-07-20' }
+            ]);
+            
+            const generateQRCode = () => {
+                const newQR = {
+                    id: `QR${String(Date.now()).slice(-3)}`,
+                    campaign: 'Neue Kampagne',
+                    touchpoint: 'Neuer Touchpoint',
+                    scans: 0,
+                    created: new Date().toISOString().split('T')[0]
+                };
+                setQrCodes([...qrCodes, newQR]);
+            };
+            
+            const downloadQR = (qrId) => {
+                // Simulate QR code download
+                alert(`QR-Code ${qrId} wird heruntergeladen...`);
+            };
+            
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900 mb-2">QR-Codes</h1>
+                            <p className="text-gray-600">Verwalten Sie Ihre generierten QR-Codes</p>
+                        </div>
+                        <button
+                            onClick={generateQRCode}
+                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                        >
+                            <Icon name="Plus" size={16} className="mr-2" />
+                            QR-Code generieren
+                        </button>
+                    </div>
+                    
+                    <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
+                            {qrCodes.map(qr => (
+                                <div key={qr.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="text-sm font-medium text-gray-900">{qr.id}</span>
+                                        <button
+                                            onClick={() => downloadQR(qr.id)}
+                                            className="text-indigo-600 hover:text-indigo-900"
+                                        >
+                                            <Icon name="Download" size={16} />
+                                        </button>
+                                    </div>
+                                    
+                                    {/* QR Code Placeholder */}
+                                    <div className="w-32 h-32 bg-gray-100 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                                        <Icon name="QrCode" size={48} className="text-gray-400" />
+                                    </div>
+                                    
+                                    <div className="text-center space-y-1">
+                                        <div className="text-sm font-medium text-gray-900">{qr.campaign}</div>
+                                        <div className="text-xs text-gray-500">{qr.touchpoint}</div>
+                                        <div className="text-lg font-semibold text-indigo-600">{qr.scans} Scans</div>
+                                        <div className="text-xs text-gray-400">Erstellt: {qr.created}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Main App Component
+        const App = () => {
+            const [currentView, setCurrentView] = useState('dashboard');
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [user, setUser] = useState(null);
+            const [editingCampaign, setEditingCampaign] = useState(null);
+            
+            const login = (email, password) => {
+                // Mock authentication
+                if (email && password) {
+                    setUser(mockData.user);
+                    setIsAuthenticated(true);
+                    return true;
+                }
+                return false;
+            };
+            
+            const logout = () => {
+                setUser(null);
+                setIsAuthenticated(false);
+                setCurrentView('dashboard');
+            };
+            
+            const handleEditCampaign = (campaign) => {
+                setEditingCampaign(campaign);
+                setCurrentView('builder');
+            };
+            
+            const handleSaveCampaign = (campaignData) => {
+                // In a real app, this would save to the backend
+                console.log('Saving campaign:', campaignData);
+                setEditingCampaign(null);
+                setCurrentView('campaigns');
+            };
+            
+            const handleCancelEdit = () => {
+                setEditingCampaign(null);
+                setCurrentView('campaigns');
+            };
+            
+            if (!isAuthenticated) {
+                return <LoginPage onLogin={login} />;
+            }
+            
+            const renderCurrentView = () => {
+                switch (currentView) {
+                    case 'dashboard':
+                        return <Dashboard />;
+                    case 'campaigns':
+                        return <CampaignsList onEditCampaign={handleEditCampaign} />;
+                    case 'builder':
+                        return (
+                            <CampaignBuilder
+                                campaign={editingCampaign}
+                                onSave={handleSaveCampaign}
+                                onCancel={handleCancelEdit}
+                            />
+                        );
+                    case 'analytics':
+                        return <Analytics />;
+                    case 'qr-codes':
+                        return <QRCodes />;
+                    default:
+                        return <Dashboard />;
+                }
+            };
+            
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    <Navigation
+                        currentView={currentView}
+                        setCurrentView={setCurrentView}
+                        user={user}
+                        onLogout={logout}
+                    />
+                    <main>
+                        {renderCurrentView()}
+                    </main>
+                </div>
+            );
+        };
+
+        // Render the app
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
